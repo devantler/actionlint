@@ -20,3 +20,8 @@ jobs:
         id: later
         run: echo later
         background: true
+      # 'parallel' cannot be nested in another 'parallel'
+      - parallel:
+          - run: echo a
+          - parallel:
+              - run: echo b

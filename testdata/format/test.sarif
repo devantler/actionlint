@@ -181,11 +181,11 @@
                 "level": "error"
               },
               "properties": {
-                "description": "Checks that \"wait\" and \"cancel\" steps refer to IDs of preceding \"background\" steps",
+                "description": "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps",
                 "queryURI": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
               },
               "fullDescription": {
-                "text": "Checks that \"wait\" and \"cancel\" steps refer to IDs of preceding \"background\" steps"
+                "text": "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps"
               },
               "helpUri": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
             },

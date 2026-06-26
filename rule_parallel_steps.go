@@ -2,8 +2,9 @@ package actionlint
 
 import "strings"
 
-// RuleParallelSteps is a rule to check references between parallel steps. A 'wait' or 'cancel' step
-// must refer to the ID of a preceding step that runs in the background (with 'background: true').
+// RuleParallelSteps is a rule to check parallel steps: a 'wait' or 'cancel' step must refer to the ID
+// of a preceding step that runs in the background (with 'background: true'), and a 'parallel' step
+// cannot be nested in another 'parallel' step.
 // https://github.blog/changelog/2026-06-25-actions-steps-can-now-be-run-in-parallel/
 type RuleParallelSteps struct {
 	RuleBase
@@ -19,7 +20,7 @@ func NewRuleParallelSteps() *RuleParallelSteps {
 	return &RuleParallelSteps{
 		RuleBase: RuleBase{
 			name: "parallel-steps",
-			desc: "Checks that \"wait\" and \"cancel\" steps refer to IDs of preceding \"background\" steps",
+			desc: "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps",
 		},
 	}
 }
@@ -45,6 +46,13 @@ func (rule *RuleParallelSteps) VisitStep(n *Step) error {
 		}
 	case *ExecCancel:
 		rule.checkRef(e.Name)
+	case *ExecParallel:
+		// A 'parallel' step cannot be nested inside another 'parallel' step.
+		for _, s := range e.Steps {
+			if _, ok := s.Exec.(*ExecParallel); ok {
+				rule.Errorf(s.Pos, "\"parallel\" step cannot be nested in another \"parallel\" step")
+			}
+		}
 	}
 
 	if n.ID != nil && !n.ID.ContainsExpression() && isBackgroundStep(n) {
