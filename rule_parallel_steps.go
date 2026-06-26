@@ -13,6 +13,11 @@ type RuleParallelSteps struct {
 	// 'parallel:' groups, so a 'wait'/'cancel' reference found in this set both exists and precedes
 	// the reference.
 	background map[string]struct{}
+	// inParallel holds the steps that are direct children of a 'parallel' group. Such steps are not
+	// allowed there at all (only 'run'/'uses' are), so their 'wait'/'cancel' references are not
+	// separately validated: the "not allowed inside a parallel group" error stands on its own
+	// instead of cascading into a redundant "unknown reference" error from the same step.
+	inParallel map[*Step]struct{}
 }
 
 // NewRuleParallelSteps creates a new RuleParallelSteps instance.
@@ -28,24 +33,33 @@ func NewRuleParallelSteps() *RuleParallelSteps {
 // VisitJobPre is callback when visiting Job node before visiting its children.
 func (rule *RuleParallelSteps) VisitJobPre(n *Job) error {
 	rule.background = map[string]struct{}{}
+	rule.inParallel = map[*Step]struct{}{}
 	return nil
 }
 
 // VisitJobPost is callback when visiting Job node after visiting its children.
 func (rule *RuleParallelSteps) VisitJobPost(n *Job) error {
 	rule.background = nil
+	rule.inParallel = nil
 	return nil
 }
 
 // VisitStep is callback when visiting Step node.
 func (rule *RuleParallelSteps) VisitStep(n *Step) error {
+	// A step that is itself inside a 'parallel' group is already reported by checkParallelChildren as
+	// not allowed there, so skip its reference check to avoid a second, redundant error.
+	_, insideParallel := rule.inParallel[n]
 	switch e := n.Exec.(type) {
 	case *ExecWait:
-		for _, name := range e.Names {
-			rule.checkRef(name)
+		if !insideParallel {
+			for _, name := range e.Names {
+				rule.checkRef(name)
+			}
 		}
 	case *ExecCancel:
-		rule.checkRef(e.Name)
+		if !insideParallel {
+			rule.checkRef(e.Name)
+		}
 	case *ExecParallel:
 		rule.checkParallelChildren(e.Steps)
 	}
@@ -62,6 +76,7 @@ func (rule *RuleParallelSteps) VisitStep(n *Step) error {
 // because steps in a 'parallel' group already run in the background with an implicit wait at the end.
 func (rule *RuleParallelSteps) checkParallelChildren(steps []*Step) {
 	for _, s := range steps {
+		rule.inParallel[s] = struct{}{}
 		if s.Background != nil {
 			rule.Errorf(s.Background.Pos, "\"background\" is not allowed for a step inside a \"parallel\" group because the group's steps already run in the background")
 		}

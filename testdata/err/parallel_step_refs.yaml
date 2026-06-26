@@ -6,10 +6,6 @@ jobs:
     steps:
       - run: echo regular
         id: regular
-      - name: Start server
-        id: server
-        run: echo server
-        background: true
       # unknown step ID
       - cancel: typo
       # 'regular' exists but is not a background step
@@ -20,12 +16,13 @@ jobs:
         id: later
         run: echo later
         background: true
-      # only 'run'/'uses' steps are allowed inside a 'parallel' group
+      # only 'run'/'uses' steps are allowed inside a 'parallel' group. A forbidden 'wait'/'cancel'
+      # here is reported once, not also as an unknown reference, even when its target does not exist.
       - parallel:
           - run: echo bg
             background: true
-          - wait: server
+          - wait: nope
           - wait-all:
-          - cancel: server
+          - cancel: nope
           - parallel:
               - run: echo nested
