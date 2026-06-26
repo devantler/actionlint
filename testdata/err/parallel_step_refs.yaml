@@ -1,0 +1,22 @@
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo regular
+        id: regular
+      - name: Start server
+        id: server
+        run: echo server
+        background: true
+      # unknown step ID
+      - cancel: typo
+      # 'regular' exists but is not a background step
+      - wait: regular
+      # 'later' is a background step defined AFTER this 'wait' (not preceding)
+      - wait: later
+      - name: Later background
+        id: later
+        run: echo later
+        background: true

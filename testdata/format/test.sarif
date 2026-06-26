@@ -175,6 +175,21 @@
               "helpUri": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
             },
             {
+              "id": "parallel-steps",
+              "name": "ParallelSteps",
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "description": "Checks that \"wait\" and \"cancel\" steps refer to IDs of preceding \"background\" steps",
+                "queryURI": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
+              },
+              "fullDescription": {
+                "text": "Checks that \"wait\" and \"cancel\" steps refer to IDs of preceding \"background\" steps"
+              },
+              "helpUri": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
+            },
+            {
               "id": "permissions",
               "name": "Permissions",
               "defaultConfiguration": {
