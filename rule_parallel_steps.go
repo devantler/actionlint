@@ -7,6 +7,11 @@ import "strings"
 // https://github.blog/changelog/2026-06-25-actions-steps-can-now-be-run-in-parallel/
 type RuleParallelSteps struct {
 	RuleBase
+	// background holds the IDs (lower-cased; step IDs are case insensitive) of the 'background: true'
+	// steps seen so far in the current job. Steps are visited in order, including steps nested in
+	// 'parallel:' groups, so a 'wait'/'cancel' reference found in this set both exists and precedes
+	// the reference.
+	background map[string]struct{}
 }
 
 // NewRuleParallelSteps creates a new RuleParallelSteps instance.
@@ -21,43 +26,41 @@ func NewRuleParallelSteps() *RuleParallelSteps {
 
 // VisitJobPre is callback when visiting Job node before visiting its children.
 func (rule *RuleParallelSteps) VisitJobPre(n *Job) error {
-	// Collect the IDs of 'background: true' steps while walking the steps in order. A 'wait' or
-	// 'cancel' step may only refer to a background step that precedes it, so checking each reference
-	// against the IDs seen so far validates existence and ordering at once. Step IDs are case
-	// insensitive, hence lower-cased.
-	background := map[string]struct{}{}
-	rule.checkSteps(n.Steps, background)
+	rule.background = map[string]struct{}{}
 	return nil
 }
 
-func (rule *RuleParallelSteps) checkSteps(steps []*Step, background map[string]struct{}) {
-	for _, s := range steps {
-		switch e := s.Exec.(type) {
-		case *ExecWait:
-			for _, name := range e.Names {
-				rule.checkRef(name, background)
-			}
-		case *ExecCancel:
-			rule.checkRef(e.Name, background)
-		case *ExecParallel:
-			// Steps grouped in 'parallel:' run after the steps before the group, so they may refer to
-			// background steps seen so far.
-			rule.checkSteps(e.Steps, background)
-		}
-
-		if id := backgroundStepID(s); id != "" {
-			background[id] = struct{}{}
-		}
-	}
+// VisitJobPost is callback when visiting Job node after visiting its children.
+func (rule *RuleParallelSteps) VisitJobPost(n *Job) error {
+	rule.background = nil
+	return nil
 }
 
-func (rule *RuleParallelSteps) checkRef(ref *String, background map[string]struct{}) {
+// VisitStep is callback when visiting Step node.
+func (rule *RuleParallelSteps) VisitStep(n *Step) error {
+	switch e := n.Exec.(type) {
+	case *ExecWait:
+		for _, name := range e.Names {
+			rule.checkRef(name)
+		}
+	case *ExecCancel:
+		rule.checkRef(e.Name)
+	}
+
+	if n.ID != nil && !n.ID.ContainsExpression() && isBackgroundStep(n) {
+		rule.background[strings.ToLower(n.ID.Value)] = struct{}{}
+	}
+
+	return nil
+}
+
+func (rule *RuleParallelSteps) checkRef(ref *String) {
 	if ref == nil || ref.Value == "" || ref.ContainsExpression() {
 		// Empty values come from an already-reported parse error; expression step IDs can't be
 		// resolved statically. Skip both.
 		return
 	}
-	if _, ok := background[strings.ToLower(ref.Value)]; !ok {
+	if _, ok := rule.background[strings.ToLower(ref.Value)]; !ok {
 		rule.Errorf(
 			ref.Pos,
 			"%q is not the ID of a preceding background step. \"wait\" and \"cancel\" steps can only refer to an earlier step that has \"background: true\"",
@@ -66,17 +69,9 @@ func (rule *RuleParallelSteps) checkRef(ref *String, background map[string]struc
 	}
 }
 
-// backgroundStepID returns the lower-cased ID of the given step if it is (or may be) a background
-// step that can be referred to by a later 'wait' or 'cancel' step. It returns an empty string when
-// the step has no static ID or is statically not a background step.
-func backgroundStepID(s *Step) string {
-	if s.ID == nil || s.ID.ContainsExpression() {
-		return ""
-	}
-	// When 'background' is an expression, whether the step runs in the background can't be known
-	// statically, so it's treated as a possible background step to avoid false positives.
-	if s.Background == nil || (s.Background.Expression == nil && !s.Background.Value) {
-		return ""
-	}
-	return strings.ToLower(s.ID.Value)
+// isBackgroundStep reports whether the step runs (or may run) in the background. When 'background' is
+// an expression, whether the step runs in the background can't be known statically, so it's treated
+// as a possible background step to avoid false positives.
+func isBackgroundStep(s *Step) bool {
+	return s.Background != nil && (s.Background.Expression != nil || s.Background.Value)
 }
