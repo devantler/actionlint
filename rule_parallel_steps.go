@@ -3,8 +3,8 @@ package actionlint
 import "strings"
 
 // RuleParallelSteps is a rule to check parallel steps: a 'wait' or 'cancel' step must refer to the ID
-// of a preceding step that runs in the background (with 'background: true'), and a 'parallel' step
-// cannot be nested in another 'parallel' step.
+// of a preceding background step, and a 'parallel' group may only contain 'run' and 'uses' steps
+// ('background', 'wait', 'wait-all', 'cancel', and nested 'parallel' steps are not allowed in it).
 // https://github.blog/changelog/2026-06-25-actions-steps-can-now-be-run-in-parallel/
 type RuleParallelSteps struct {
 	RuleBase
@@ -20,7 +20,7 @@ func NewRuleParallelSteps() *RuleParallelSteps {
 	return &RuleParallelSteps{
 		RuleBase: RuleBase{
 			name: "parallel-steps",
-			desc: "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps",
+			desc: "Checks \"wait\"/\"cancel\" references to background steps and steps forbidden inside a \"parallel\" group",
 		},
 	}
 }
@@ -47,12 +47,7 @@ func (rule *RuleParallelSteps) VisitStep(n *Step) error {
 	case *ExecCancel:
 		rule.checkRef(e.Name)
 	case *ExecParallel:
-		// A 'parallel' step cannot be nested inside another 'parallel' step.
-		for _, s := range e.Steps {
-			if _, ok := s.Exec.(*ExecParallel); ok {
-				rule.Errorf(s.Pos, "\"parallel\" step cannot be nested in another \"parallel\" step")
-			}
-		}
+		rule.checkParallelChildren(e.Steps)
 	}
 
 	if n.ID != nil && !n.ID.ContainsExpression() && isBackgroundStep(n) {
@@ -60,6 +55,29 @@ func (rule *RuleParallelSteps) VisitStep(n *Step) error {
 	}
 
 	return nil
+}
+
+// checkParallelChildren checks the steps inside a 'parallel' group. Only 'run' and 'uses' steps are
+// allowed there: 'background', 'wait', 'wait-all', 'cancel', and nested 'parallel' steps are not,
+// because steps in a 'parallel' group already run in the background with an implicit wait at the end.
+func (rule *RuleParallelSteps) checkParallelChildren(steps []*Step) {
+	for _, s := range steps {
+		if s.Background != nil {
+			rule.Errorf(s.Background.Pos, "\"background\" is not allowed for a step inside a \"parallel\" group because the group's steps already run in the background")
+		}
+		switch e := s.Exec.(type) {
+		case *ExecWait:
+			kind := "wait"
+			if e.All {
+				kind = "wait-all"
+			}
+			rule.Errorf(s.Pos, "%q step is not allowed inside a \"parallel\" group", kind)
+		case *ExecCancel:
+			rule.Errorf(s.Pos, "\"cancel\" step is not allowed inside a \"parallel\" group")
+		case *ExecParallel:
+			rule.Errorf(s.Pos, "\"parallel\" step cannot be nested in another \"parallel\" step")
+		}
+	}
 }
 
 func (rule *RuleParallelSteps) checkRef(ref *String) {

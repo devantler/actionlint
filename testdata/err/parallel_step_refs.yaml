@@ -20,8 +20,12 @@ jobs:
         id: later
         run: echo later
         background: true
-      # 'parallel' cannot be nested in another 'parallel'
+      # only 'run'/'uses' steps are allowed inside a 'parallel' group
       - parallel:
-          - run: echo a
+          - run: echo bg
+            background: true
+          - wait: server
+          - wait-all:
+          - cancel: server
           - parallel:
-              - run: echo b
+              - run: echo nested

@@ -20,7 +20,7 @@ List of checks:
 - [pyflakes integration for `run:`](#check-pyflakes-integ)
 - [Script injection by potentially untrusted inputs](#untrusted-inputs)
 - [Job dependencies validation](#check-job-deps)
-- [Parallel step references](#check-parallel-step-refs)
+- [Parallel steps](#check-parallel-step-refs)
 - [Matrix values](#check-matrix-values)
 - [Webhook events validation](#check-webhook-events)
 - [Workflow dispatch event validation](#check-workflow-dispatch-events)
@@ -1224,7 +1224,7 @@ test.yaml:8:3: job "bar" needs job "unknown" which does not exist in this workfl
 [Playground](https://rhysd.github.io/actionlint/#eNqkjDsOAjEMRPucYrptyAXcwRFoEUUMRuEjexXb4vooS0VNNdLMvGdKWNN7eRg7FeBmNgNQkasTTtzGDof98by1I9XrhJJTI+urhXhsk4es/mWBOp8EuXTD0u9LAbiNX3PqU+2t/4k/AQAA//96DTh7)
 
 <a id="check-parallel-step-refs"></a>
-## Parallel step references
+## Parallel steps
 
 Example input:
 

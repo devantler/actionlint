@@ -181,11 +181,11 @@
                 "level": "error"
               },
               "properties": {
-                "description": "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps",
+                "description": "Checks \"wait\"/\"cancel\" references to background steps and steps forbidden inside a \"parallel\" group",
                 "queryURI": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
               },
               "fullDescription": {
-                "text": "Checks \"wait\"/\"cancel\" references to background steps and nesting of \"parallel\" steps"
+                "text": "Checks \"wait\"/\"cancel\" references to background steps and steps forbidden inside a \"parallel\" group"
               },
               "helpUri": "https://github.com/rhysd/actionlint/blob/main/docs/checks.md"
             },
